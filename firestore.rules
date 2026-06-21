@@ -1,0 +1,129 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net Default-Deny-All
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Reuseable global helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Entity Validations
+
+    function isValidUserStats(data) {
+      return (
+        data.keys().hasAll(['targetLanguageCode', 'level', 'xp', 'streak', 'completedChallengesToday', 'completedReviewsTodayCount', 'badges']) &&
+        data.keys().size() <= 8 &&
+        data.targetLanguageCode is string &&
+        data.targetLanguageCode.size() <= 10 &&
+        data.level is string &&
+        (data.level == 'beginner' || data.level == 'intermediate' || data.level == 'advanced') &&
+        data.xp is int &&
+        data.xp >= 0 &&
+        data.streak is int &&
+        data.streak >= 0 &&
+        data.completedChallengesToday is list &&
+        data.completedChallengesToday.size() <= 100 &&
+        data.completedReviewsTodayCount is int &&
+        data.completedReviewsTodayCount >= 0 &&
+        data.badges is list &&
+        data.badges.size() <= 100 &&
+        (!('lastStudiedDate' in data) || (data.lastStudiedDate is string && data.lastStudiedDate.size() <= 30))
+      );
+    }
+
+    function isValidSRSCard(data) {
+      return (
+        data.keys().hasAll(['id', 'front', 'back', 'languageCode', 'createdAt', 'interval', 'repetitions', 'easeFactor', 'nextDueDate']) &&
+        data.keys().size() <= 12 &&
+        data.id is string &&
+        data.id.size() <= 128 &&
+        data.front is string &&
+        data.front.size() <= 1000 &&
+        data.back is string &&
+        data.back.size() <= 1000 &&
+        data.languageCode is string &&
+        data.languageCode.size() <= 10 &&
+        data.createdAt is string &&
+        data.interval is int &&
+        data.repetitions is int &&
+        (data.easeFactor is int || data.easeFactor is float) &&
+        data.nextDueDate is string &&
+        (!('pronunciation' in data) || (data.pronunciation is string && data.pronunciation.size() <= 1000)) &&
+        (!('example' in data) || (data.example is string && data.example.size() <= 2000)) &&
+        (!('exampleTranslation' in data) || (data.exampleTranslation is string && data.exampleTranslation.size() <= 2000))
+      );
+    }
+
+    function isValidChatMessage(data) {
+      return (
+        data.keys().hasAll(['id', 'sender', 'text', 'timestamp']) &&
+        data.keys().size() <= 8 &&
+        data.id is string &&
+        data.id.size() <= 128 &&
+        data.sender is string &&
+        (data.sender == 'user' || data.sender == 'tutor') &&
+        data.text is string &&
+        data.text.size() <= 10000 &&
+        data.timestamp is string &&
+        (!('translation' in data) || (data.translation is string && data.translation.size() <= 10000)) &&
+        (!('pronunciation' in data) || (data.pronunciation is string && data.pronunciation.size() <= 10000)) &&
+        (!('explanation' in data) || (data.explanation is string && data.explanation.size() <= 10000))
+      );
+    }
+
+    // Resource Paths
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      
+      allow create: if isOwner(userId) && isValidUserStats(incoming());
+      
+      allow update: if isOwner(userId) && isValidUserStats(incoming()) && (
+        incoming().targetLanguageCode == existing().targetLanguageCode
+      );
+      
+      allow delete: if isOwner(userId);
+
+      // Cards subcollection
+      match /cards/{cardId} {
+        allow get: if isOwner(userId) && isValidId(cardId);
+        allow list: if isOwner(userId);
+        
+        allow create: if isOwner(userId) && isValidId(cardId) && isValidSRSCard(incoming());
+        allow update: if isOwner(userId) && isValidId(cardId) && isValidSRSCard(incoming());
+        allow delete: if isOwner(userId) && isValidId(cardId);
+      }
+
+      // Chats subcollection
+      match /chats/{chatId} {
+        allow get: if isOwner(userId) && isValidId(chatId);
+        allow list: if isOwner(userId);
+        
+        allow create: if isOwner(userId) && isValidId(chatId) && isValidChatMessage(incoming());
+        allow update: if isOwner(userId) && isValidId(chatId) && isValidChatMessage(incoming());
+        allow delete: if isOwner(userId) && isValidId(chatId);
+      }
+    }
+  }
+}

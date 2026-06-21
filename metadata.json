@@ -1,0 +1,6 @@
+{
+  "name": "Language Learning & Spaced Repetition App",
+  "description": "An interactive language learning application featuring AI-powered daily challenges, spaced repetition cards (SRS), custom translation tools, and a real-time conversational tutor.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

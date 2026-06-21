@@ -1,0 +1,146 @@
+{
+  "entities": {
+    "UserStats": {
+      "title": "UserStats",
+      "description": "Progress, XP, streak, and preferences for a registered learner",
+      "type": "object",
+      "properties": {
+        "targetLanguageCode": {
+          "type": "string",
+          "description": "Standard two letter ISO country/language code"
+        },
+        "level": {
+          "type": "string",
+          "enum": ["beginner", "intermediate", "advanced"],
+          "description": "proficiency label preference"
+        },
+        "xp": {
+          "type": "integer",
+          "description": "Accrued experience points"
+        },
+        "streak": {
+          "type": "integer",
+          "description": "Consecutive study days count"
+        },
+        "lastStudiedDate": {
+          "type": "string",
+          "format": "date",
+          "description": "ISO date YYYY-MM-DD when points were earned"
+        },
+        "completedChallengesToday": {
+          "type": "array",
+          "description": "List of challenge IDs successfully passed today"
+        },
+        "completedReviewsTodayCount": {
+          "type": "integer",
+          "description": "Number of SRS flashcards reviewed today"
+        },
+        "badges": {
+          "type": "array",
+          "description": "Key identifier string for milestones accomplished"
+        }
+      },
+      "required": ["targetLanguageCode", "level", "xp", "streak"]
+    },
+    "SRSCard": {
+      "title": "SRSCard",
+      "description": "A spaced-repetition card under the user's vocabulary dashboard",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "front": {
+          "type": "string",
+          "description": "Vocabulary element text in the target custom language"
+        },
+        "back": {
+          "type": "string",
+          "description": "Translation of target text in parent native tongue"
+        },
+        "languageCode": {
+          "type": "string",
+          "description": "Target language classification code"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "interval": {
+          "type": "integer",
+          "description": "SM-2 interval in days"
+        },
+        "repetitions": {
+          "type": "integer",
+          "description": "Consecutive correct rehearsals"
+        },
+        "easeFactor": {
+          "type": "number",
+          "description": "SM-2 multiplier starting at 2.5"
+        },
+        "nextDueDate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "pronunciation": {
+          "type": "string",
+          "description": "Phonetic or pronunciation transcript text block"
+        },
+        "example": {
+          "type": "string",
+          "description": "Auxiliary target sentence demonstrating use"
+        },
+        "exampleTranslation": {
+          "type": "string",
+          "description": "Translation of example sentence"
+        }
+      },
+      "required": ["id", "front", "back", "languageCode", "createdAt", "interval", "repetitions", "easeFactor", "nextDueDate"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Single bubble message within the AI Voice Tutor interface",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "sender": {
+          "type": "string",
+          "enum": ["user", "tutor"]
+        },
+        "text": {
+          "type": "string"
+        },
+        "translation": {
+          "type": "string"
+        },
+        "pronunciation": {
+          "type": "string"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "sender", "text", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserStats",
+      "description": "User preferences and progress stats"
+    },
+    "/users/{userId}/cards/{cardId}": {
+      "schema": "SRSCard",
+      "description": "User vocabulary deck for spaced-repetition spacing"
+    },
+    "/users/{userId}/chats/{chatId}": {
+      "schema": "ChatMessage",
+      "description": "Chat log history with the virtual linguistic helper conversationalist"
+    }
+  }
+}
