@@ -48,12 +48,24 @@ export default function SpacedRepetitionView({
   const currentCard = activeDeck[currentIndex];
 
   // TTS Helper
-  const handleSpeak = (text: string, e?: React.MouseEvent) => {
+  const handleSpeak = (text: string, languageCode?: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = currentLang.pronunciationLocale;
+      const cardLang = languages.find(l => l.code === languageCode) || currentLang;
+      utterance.lang = cardLang.pronunciationLocale;
+      
+      // Select appropriate browser voice for better pronunciation
+      const voices = window.speechSynthesis.getVoices();
+      const matchingVoice = voices.find(voice => 
+        voice.lang.toLowerCase() === cardLang.pronunciationLocale.toLowerCase() ||
+        voice.lang.toLowerCase().startsWith(cardLang.code.toLowerCase())
+      );
+      if (matchingVoice) {
+        utterance.voice = matchingVoice;
+      }
+      
       window.speechSynthesis.speak(utterance);
     }
   };
@@ -307,7 +319,7 @@ export default function SpacedRepetitionView({
                           <span className="font-bold text-slate-805 text-sm leading-tight">{card.front}</span>
                           <button
                             id={`listen-btn-list-${card.id}`}
-                            onClick={(e) => handleSpeak(card.front, e)}
+                            onClick={(e) => handleSpeak(card.front, card.languageCode, e)}
                             className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 text-slate-600 hover:text-indigo-700 font-bold transition-all cursor-pointer text-[11px]"
                             title="Hear pronunciation"
                           >
@@ -392,7 +404,7 @@ export default function SpacedRepetitionView({
                   <span className="text-xs font-bold uppercase tracking-widest text-indigo-500">{currentLang.name}</span>
                   <button
                     id={`listen-btn-front-${currentCard.id}`}
-                    onClick={(e) => handleSpeak(currentCard.front, e)}
+                    onClick={(e) => handleSpeak(currentCard.front, currentCard.languageCode, e)}
                     className="flex items-center gap-1.5 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 px-3 py-1.5 rounded-xl border border-slate-200 hover:border-indigo-200 font-bold text-xs transition-all cursor-pointer"
                     title="Hear pronunciation"
                   >
@@ -419,7 +431,7 @@ export default function SpacedRepetitionView({
                   <span className="text-xs font-bold uppercase tracking-widest text-emerald-400">English Translation</span>
                   <button
                     id={`listen-btn-back-${currentCard.id}`}
-                    onClick={(e) => handleSpeak(currentCard.front, e)}
+                    onClick={(e) => handleSpeak(currentCard.front, currentCard.languageCode, e)}
                     className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer"
                     title="Hear pronunciation"
                   >

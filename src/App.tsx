@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   LayoutDashboard, 
   Layers, 
@@ -20,6 +20,7 @@ import SpacedRepetitionView from './components/SpacedRepetitionView';
 import DailyChallengesView from './components/DailyChallengesView';
 import AITutorView from './components/AITutorView';
 import LoginView from './components/LoginView';
+import BadgeNotificationOverlay, { BadgeUnlock, getBadgeDetails } from './components/BadgeNotificationOverlay';
 import { useFirebaseSync } from './hooks/useFirebaseSync';
 
 import { auth, db, handleFirestoreError, logoutUser, OperationType, testFirestoreConnection } from './firebase';
@@ -196,6 +197,9 @@ export default function App() {
   const [loadingChallenges, setLoadingChallenges] = useState(false);
   const [loadingAiCards, setLoadingAiCards] = useState(false);
 
+  // Achievement Notification Queue State
+  const [unlockedBadgeQueue, setUnlockedBadgeQueue] = useState<BadgeUnlock[]>([]);
+
   // States
   const [stats, setStats] = useState<UserStats>(() => {
     const saved = localStorage.getItem('aura_stats');
@@ -287,6 +291,35 @@ export default function App() {
       updateCloudStats(stats).catch(e => console.error("Cloud stats save failed:", e));
     }
   }, [stats, user]);
+
+  // Keep track of previously loaded badges to detect new dynamic unlocks
+  const prevBadgesRef = useRef<string[]>(stats.badges || []);
+
+  useEffect(() => {
+    if (syncLoading) {
+      // While syncing or loading from Cloud, only align the ref to prevent initial overlay spam
+      prevBadgesRef.current = stats.badges || [];
+      return;
+    }
+
+    const currentBadges = stats.badges || [];
+    const prevBadges = prevBadgesRef.current;
+
+    // Filter newly unlocked badges
+    const newlyEarned = currentBadges.filter(b => !prevBadges.includes(b));
+    if (newlyEarned.length > 0) {
+      const newBadgeDetails = newlyEarned.map(badgeId => {
+        const details = getBadgeDetails(badgeId);
+        return {
+          id: badgeId,
+          ...details
+        };
+      });
+      setUnlockedBadgeQueue(prev => [...prev, ...newBadgeDetails]);
+    }
+
+    prevBadgesRef.current = currentBadges;
+  }, [stats.badges, syncLoading]);
 
   // Streak verification on layout boot
   useEffect(() => {
@@ -835,6 +868,14 @@ export default function App() {
           </div>
         </div>
       </footer>
+
+      {/* Achievement Unlocked Celebratory Overlay */}
+      <BadgeNotificationOverlay
+        queue={unlockedBadgeQueue}
+        onDismiss={(id) => {
+          setUnlockedBadgeQueue(prev => prev.filter(b => b.id !== id));
+        }}
+      />
 
     </div>
   );

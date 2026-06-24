@@ -293,7 +293,7 @@ function deckCountAtBeginning(cards: SRSCard[], completedReviews: number): numbe
   return Math.max(0, cards.filter(c => c.repetitions === 0).length - completedReviews);
 }
 
-function getBadgeDetails(id: string): { name: string; description: string; emoji: string } {
+export function getBadgeDetails(id: string): { name: string; description: string; emoji: string } {
   switch (id) {
     case 'first_challenge':
       return { name: 'Pioneer Flame', description: 'Finished first daily challenge.', emoji: '🚀' };

@@ -38,7 +38,84 @@ export default function AITutorView({
   const [hasSavedMessageCard, setHasSavedMessageCard] = useState<Record<string, boolean>>({});
   const [showVoicePractice, setShowVoicePractice] = useState(false);
 
+  // Speech Recognition States
+  const [isListening, setIsListening] = useState(false);
+  const [speechError, setSpeechError] = useState<string | null>(null);
+  const recognitionRef = useRef<any>(null);
+
   const chatBottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognitionClass) {
+      const rec = new SpeechRecognitionClass();
+      rec.continuous = false;
+      rec.interimResults = false;
+
+      rec.onstart = () => {
+        setIsListening(true);
+        setSpeechError(null);
+      };
+
+      rec.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        if (transcript) {
+          setInputText(prev => {
+            const trimmed = prev.trim();
+            return trimmed ? `${trimmed} ${transcript}` : transcript;
+          });
+        }
+      };
+
+      rec.onerror = (event: any) => {
+        console.error('Speech recognition error', event);
+        if (event.error === 'no-speech') {
+          setSpeechError('No speech was detected. Please try speaking again.');
+        } else if (event.error === 'not-allowed') {
+          setSpeechError('Microphone permission blocked or denied.');
+        } else {
+          setSpeechError(`Speech recognition error: ${event.error}`);
+        }
+        setIsListening(false);
+      };
+
+      rec.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = rec;
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch (e) {}
+      }
+    };
+  }, []);
+
+  const toggleListening = () => {
+    if (!recognitionRef.current) {
+      setSpeechError('Speech recognition is not supported in this browser.');
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+    } else {
+      setSpeechError(null);
+      recognitionRef.current.lang = currentLang.pronunciationLocale || targetLanguageCode;
+      try {
+        recognitionRef.current.start();
+      } catch (err: any) {
+        console.error('Speech recognition start failed', err);
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {}
+      }
+    }
+  };
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -228,17 +305,71 @@ export default function AITutorView({
             </div>
           )}
 
+          {/* Speech Dictation Status/Error Indicator */}
+          {(isListening || speechError) && (
+            <div className={`px-6 py-2 border-t text-xs font-semibold flex items-center justify-between transition-all duration-300 ${
+              speechError ? 'bg-red-50 text-red-600 border-red-100' : 'bg-indigo-50 text-indigo-700 border-indigo-100'
+            }`}>
+              <div className="flex items-center gap-2">
+                {isListening ? (
+                  <>
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    </span>
+                    <span>Dictating in {currentLang.name}. Speak now...</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                    <span>{speechError}</span>
+                  </>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsListening(false);
+                  setSpeechError(null);
+                  if (recognitionRef.current) {
+                    try {
+                      recognitionRef.current.abort();
+                    } catch (e) {}
+                  }
+                }}
+                className="text-[10px] uppercase font-bold tracking-wider text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
           {/* Interactive panel tools */}
           <form onSubmit={handleSend} className="p-4 border-t-2 border-slate-200 bg-white flex gap-2">
-            <input
-              required
-              disabled={loadingChat}
-              type="text"
-              value={inputText}
-              onChange={e => setInputText(e.target.value)}
-              placeholder={`Write something in ${currentLang.name} or English...`}
-              className="flex-1 bg-slate-50 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white focus:border-indigo-500 transition-all font-semibold border-2 border-slate-200 text-slate-850"
-            />
+            <div className="relative flex-1 flex">
+              <input
+                required={!isListening}
+                disabled={loadingChat}
+                type="text"
+                value={inputText}
+                onChange={e => setInputText(e.target.value)}
+                placeholder={isListening ? "Listening... Speak now..." : `Write something in ${currentLang.name} or English...`}
+                className="flex-1 bg-slate-50 rounded-2xl pl-4 pr-12 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white focus:border-indigo-500 transition-all font-semibold border-2 border-slate-200 text-slate-850"
+              />
+              <button
+                type="button"
+                id="dictation-btn"
+                onClick={toggleListening}
+                className={`absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-xl flex items-center justify-center transition-all cursor-pointer ${
+                  isListening
+                    ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse shadow-sm'
+                    : 'bg-transparent text-slate-400 hover:text-indigo-600 hover:bg-slate-100'
+                }`}
+                title={isListening ? "Stop dictating" : `Dictate response in ${currentLang.name}`}
+              >
+                <Mic className="h-4 w-4" />
+              </button>
+            </div>
             <button
               type="button"
               id="voice-practice-toggle"
